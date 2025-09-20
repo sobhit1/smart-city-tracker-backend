@@ -18,6 +18,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashSet;
+
 @Service
 public class AuthService {
 
@@ -99,7 +101,7 @@ public class AuthService {
                 ));
 
         if (user.getRoles() == null) {
-            user.setRoles(new java.util.HashSet<>());
+            user.setRoles(new HashSet<>());
         }
         user.getRoles().add(userRole);
 
