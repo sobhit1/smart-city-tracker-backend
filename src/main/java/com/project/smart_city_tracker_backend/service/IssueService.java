@@ -1,15 +1,22 @@
 package com.project.smart_city_tracker_backend.service;
 
 import com.project.smart_city_tracker_backend.dto.CreateIssueRequest;
+import com.project.smart_city_tracker_backend.dto.IssueSummaryDTO;
 import com.project.smart_city_tracker_backend.exception.BadRequestException;
 import com.project.smart_city_tracker_backend.model.*;
 import com.project.smart_city_tracker_backend.repository.*;
 import com.project.smart_city_tracker_backend.security.SecurityUtils;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import jakarta.persistence.criteria.Predicate;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -61,7 +68,6 @@ public class IssueService {
         issue.setLatitude(request.getLatitude());
         issue.setLongitude(request.getLongitude());
         issue.setReporter(reporter);
-
         issue.setCategory(category);
         issue.setStatus(initialStatus);
         issue.setPriority(defaultPriority);
@@ -83,5 +89,49 @@ public class IssueService {
         }
 
         return issueRepository.save(issue);
+    }
+
+    /**
+     * Fetches a paginated and filtered list of issues.
+     *
+     * @param pageable The pagination information (page number, size, sort).
+     * @param search   An optional search term to filter by title or description.
+     * @param category An optional category name to filter by.
+     * @param status   An optional status name to filter by.
+     * @return A Page of IssueSummaryDTOs.
+     */
+    @Transactional(readOnly = true)
+    public Page<IssueSummaryDTO> getAllIssues(Pageable pageable, String search, String category, String status) {
+        Specification<Issue> spec = buildSpecification(search, category, status);
+
+        Page<Issue> issuesPage = issueRepository.findAll(spec, pageable);
+
+        return issuesPage.map(IssueSummaryDTO::new);
+    }
+
+    /**
+     * A private helper method to build a dynamic JPA Specification based on the provided filters.
+     * This keeps the main service method clean and readable.
+     */
+    private Specification<Issue> buildSpecification(String search, String category, String status) {
+        return (root, query, criteriaBuilder) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            if (StringUtils.hasText(search)) {
+                Predicate titlePredicate = criteriaBuilder.like(criteriaBuilder.lower(root.get("title")), "%" + search.toLowerCase() + "%");
+                Predicate descriptionPredicate = criteriaBuilder.like(criteriaBuilder.lower(root.get("description")), "%" + search.toLowerCase() + "%");
+                predicates.add(criteriaBuilder.or(titlePredicate, descriptionPredicate));
+            }
+
+            if (StringUtils.hasText(category) && !category.equalsIgnoreCase("All")) {
+                predicates.add(criteriaBuilder.equal(root.join("category").get("name"), category));
+            }
+
+            if (StringUtils.hasText(status) && !status.equalsIgnoreCase("All")) {
+                predicates.add(criteriaBuilder.equal(root.join("status").get("name"), status));
+            }
+
+            return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
+        };
     }
 }

@@ -1,15 +1,19 @@
 package com.project.smart_city_tracker_backend.controller;
 
 import com.project.smart_city_tracker_backend.dto.CreateIssueRequest;
-import com.project.smart_city_tracker_backend.exception.BadRequestException; // Import BadRequestException
+import com.project.smart_city_tracker_backend.dto.IssueSummaryDTO;
+import com.project.smart_city_tracker_backend.exception.BadRequestException;
 import com.project.smart_city_tracker_backend.model.Issue;
 import com.project.smart_city_tracker_backend.service.IssueService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -58,5 +62,40 @@ public class IssueController {
 
         Issue newIssue = issueService.createIssue(request, files);
         return new ResponseEntity<>(newIssue, HttpStatus.CREATED);
+    }
+
+    /**
+     * Handles fetching a paginated and filtered list of all issues for the dashboard.
+     *
+     * @param pageable The pagination information (page, size, sort) provided by Spring.
+     * @param search   Optional search term to filter issues by title or description.
+     * @param category Optional category to filter issues by.
+     * @param status   Optional status to filter issues by.
+     * @return A ResponseEntity containing a Page of IssueSummaryDTOs.
+     */
+    @GetMapping
+    @PreAuthorize("isAuthenticated()")
+    @Operation(
+        summary = "Get all issues (paginated and filtered)",
+        description = "Returns a paginated list of issues, with optional filters for search, category, and status.",
+        security = @SecurityRequirement(name = "bearerAuth"),
+        parameters = {
+            @Parameter(name = "page", description = "Page number (0..N)"),
+            @Parameter(name = "size", description = "Number of elements per page"),
+            @Parameter(name = "sort", description = "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.")
+        },
+        responses = {
+            @ApiResponse(responseCode = "200", description = "Successfully retrieved list of issues"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized")
+        }
+    )
+    public ResponseEntity<Page<IssueSummaryDTO>> getAllIssues(
+            Pageable pageable,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String status) {
+        
+        Page<IssueSummaryDTO> issuesPage = issueService.getAllIssues(pageable, search, category, status);
+        return ResponseEntity.ok(issuesPage);
     }
 }
