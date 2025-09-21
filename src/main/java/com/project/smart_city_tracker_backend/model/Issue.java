@@ -68,8 +68,16 @@ public class Issue {
     @OneToMany(mappedBy = "issue", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private Set<Attachment> attachments = new HashSet<>();
 
+    @OneToMany(mappedBy = "issue", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private Set<Comment> comments = new HashSet<>();
+
     public void addAttachment(Attachment attachment) {
         attachments.add(attachment);
         attachment.setIssue(this);
+    }
+
+    public void addComment(Comment comment) {
+        comments.add(comment);
+        comment.setIssue(this);
     }
 }

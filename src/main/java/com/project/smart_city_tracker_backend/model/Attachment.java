@@ -39,9 +39,14 @@ public class Attachment {
     private Instant createdAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "issue_id", nullable = false)
+    @JoinColumn(name = "issue_id", nullable = true)
     @JsonIgnore
     private Issue issue;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "comment_id", nullable = true)
+    @JsonIgnore
+    private Comment comment;
 
     public Attachment(String url, String publicId, String fileName, String fileType, Issue issue) {
         this.url = url;
@@ -49,5 +54,13 @@ public class Attachment {
         this.fileName = fileName;
         this.fileType = fileType;
         this.issue = issue;
+    }
+
+    public Attachment(String url, String publicId, String fileName, String fileType, Comment comment) {
+        this.url = url;
+        this.publicId = publicId;
+        this.fileName = fileName;
+        this.fileType = fileType;
+        this.comment = comment;
     }
 }

@@ -1,9 +1,13 @@
 package com.project.smart_city_tracker_backend.controller;
 
+import com.project.smart_city_tracker_backend.dto.CommentResponseDTO;
+import com.project.smart_city_tracker_backend.dto.CreateCommentRequest;
 import com.project.smart_city_tracker_backend.dto.CreateIssueRequest;
 import com.project.smart_city_tracker_backend.dto.IssueSummaryDTO;
 import com.project.smart_city_tracker_backend.exception.BadRequestException;
+import com.project.smart_city_tracker_backend.model.Comment;
 import com.project.smart_city_tracker_backend.model.Issue;
+import com.project.smart_city_tracker_backend.service.CommentService;
 import com.project.smart_city_tracker_backend.service.IssueService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -28,9 +32,11 @@ import java.util.List;
 public class IssueController {
 
     private final IssueService issueService;
+    private final CommentService commentService;
 
-    public IssueController(IssueService issueService) {
+    public IssueController(IssueService issueService, CommentService commentService) {
         this.issueService = issueService;
+        this.commentService = commentService;
     }
 
     /**
@@ -97,5 +103,36 @@ public class IssueController {
         
         Page<IssueSummaryDTO> issuesPage = issueService.getAllIssues(pageable, search, category, status);
         return ResponseEntity.ok(issuesPage);
+    }
+    
+    /**
+     * Handles adding a new comment to a specific issue. This endpoint supports
+     * threaded replies and file attachments with the comment.
+     *
+     * @param issueId The ID of the issue to comment on.
+     * @param request The JSON part of the request containing the comment text and optional parentId.
+     * @param files   An optional list of files to attach to the comment.
+     * @return A ResponseEntity containing the newly created comment.
+     */
+    @PostMapping(value = "/{issueId}/comments", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("isAuthenticated()")
+    @Operation(
+        summary = "Add a comment to an issue",
+        description = "Adds a new comment to a specific issue. Can include a parentId to be a reply, and can include file attachments.",
+        security = @SecurityRequirement(name = "bearerAuth"),
+        responses = {
+            @ApiResponse(responseCode = "201", description = "Comment created successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = CommentResponseDTO.class))),
+            @ApiResponse(responseCode = "400", description = "Bad Request (e.g., validation error)"),
+            @ApiResponse(responseCode = "404", description = "Issue or parent comment not found")
+        }
+    )
+    public ResponseEntity<CommentResponseDTO> addComment(
+            @PathVariable Long issueId,
+            @RequestPart("commentData") @Valid CreateCommentRequest request,
+            @RequestPart(value = "files", required = false) List<MultipartFile> files) {
+        
+        Comment newComment = commentService.addComment(issueId, request, files);
+        
+        return new ResponseEntity<>(new CommentResponseDTO(newComment), HttpStatus.CREATED);
     }
 }
