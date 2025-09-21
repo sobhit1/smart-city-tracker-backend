@@ -30,6 +30,8 @@ public class IssueDetailsDTO {
     private Instant updatedAt;
     private UserSummaryDTO reporter;
     private UserSummaryDTO assignee;
+    private Instant startDate;
+    private Instant dueDate;
     private List<AttachmentDTO> attachments;
     private List<CommentDTO> comments;
 
@@ -91,6 +93,9 @@ public class IssueDetailsDTO {
         if (issue.getAssignee() != null) {
             this.assignee = new UserSummaryDTO(issue.getAssignee().getId(), issue.getAssignee().getFullName());
         }
+
+        this.startDate = issue.getStartDate();
+        this.dueDate = issue.getDueDate();
 
         if (issue.getAttachments() != null) {
             this.attachments = issue.getAttachments().stream()

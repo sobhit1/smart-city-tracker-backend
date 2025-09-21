@@ -65,6 +65,12 @@ public class Issue {
     @JoinColumn(name = "assignee_id")
     private User assignee;
 
+    @Column(name = "start_date")
+    private Instant startDate;
+
+    @Column(name = "due_date")
+    private Instant dueDate;
+
     @OneToMany(mappedBy = "issue", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private Set<Attachment> attachments = new HashSet<>();
 

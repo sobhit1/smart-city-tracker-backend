@@ -197,7 +197,7 @@ public class IssueController {
     @PreAuthorize("isAuthenticated()")
     @Operation(
         summary = "Add attachments to an issue",
-        description = "Uploads one or more files as attachments (proofs) to an existing issue. Requires STAFF or ADMIN role or should be Reporter.",
+        description = "Uploads one or more files as attachments (proofs) to an existing issue. Requires Admin, Assignee, or Reporter permissions.",
         security = @SecurityRequirement(name = "bearerAuth"),
         responses = {
             @ApiResponse(responseCode = "201", description = "Attachments added successfully"),
@@ -303,5 +303,36 @@ public class IssueController {
     public ResponseEntity<IssueDetailsDTO> getIssueById(@PathVariable Long issueId) {
         IssueDetailsDTO issueDetails = issueService.getIssueById(issueId);
         return ResponseEntity.ok(issueDetails);
+    }
+
+    /**
+     * Handles updating the details of an existing issue.
+     *
+     * @param issueId The ID of the issue to update.
+     * @param request The request body containing the fields to update.
+     * @return A ResponseEntity containing the full, updated issue details.
+     */
+    @PutMapping("/{issueId}")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(
+        summary = "Update an issue",
+        description = "Updates details of an existing issue (e.g., status, assignee, title). Requires Admin, Assignee, or Reporter permissions.",
+        security = @SecurityRequirement(name = "bearerAuth"),
+        responses = {
+            @ApiResponse(responseCode = "200", description = "Issue updated successfully",
+                content = @Content(mediaType = "application/json",
+                schema = @Schema(implementation = IssueDetailsDTO.class))),
+            @ApiResponse(responseCode = "400", description = "Bad Request (e.g., validation error, invalid ID)"),
+            @ApiResponse(responseCode = "403", description = "Forbidden (user does not have permission)"),
+            @ApiResponse(responseCode = "404", description = "Issue not found")
+        }
+    )
+    public ResponseEntity<IssueDetailsDTO> updateIssue(
+            @PathVariable Long issueId,
+            @Valid @RequestBody UpdateIssueRequest request) {
+
+        Issue updatedIssue = issueService.updateIssue(issueId, request);
+
+        return ResponseEntity.ok(new IssueDetailsDTO(updatedIssue));
     }
 }

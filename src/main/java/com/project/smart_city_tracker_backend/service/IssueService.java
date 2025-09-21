@@ -14,6 +14,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.persistence.criteria.Predicate;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.*;
 
 @Service
@@ -21,20 +22,23 @@ public class IssueService {
 
     private final IssueRepository issueRepository;
     private final CloudinaryService cloudinaryService;
+    private final AttachmentRepository attachmentRepository;
     private final CategoryRepository categoryRepository;
     private final StatusRepository statusRepository;
     private final PriorityRepository priorityRepository;
-    private final AttachmentRepository attachmentRepository;
+    private final UserRepository userRepository;
 
     public IssueService(IssueRepository issueRepository, CloudinaryService cloudinaryService,
-                        CategoryRepository categoryRepository, StatusRepository statusRepository, PriorityRepository priorityRepository,
-                        AttachmentRepository attachmentRepository) {
+                        AttachmentRepository attachmentRepository, CategoryRepository categoryRepository,
+                        StatusRepository statusRepository, PriorityRepository priorityRepository,
+                        UserRepository userRepository) {
         this.issueRepository = issueRepository;
         this.cloudinaryService = cloudinaryService;
+        this.attachmentRepository = attachmentRepository;
         this.categoryRepository = categoryRepository;
         this.statusRepository = statusRepository;
         this.priorityRepository = priorityRepository;
-        this.attachmentRepository = attachmentRepository;
+        this.userRepository = userRepository;
     }
 
     /**
@@ -247,5 +251,72 @@ public class IssueService {
                 .orElseThrow(() -> new ResourceNotFoundException("Issue", "id", issueId));
 
         return new IssueDetailsDTO(issue);
+    }
+
+    /**
+     * Updates an existing issue with the provided data. This method handles partial updates
+     * and performs all necessary security and business rule validations.
+     *
+     * @param issueId The ID of the issue to update.
+     * @param request The DTO containing the fields to be updated.
+     * @return The updated and saved Issue entity.
+     */
+    @Transactional
+    public Issue updateIssue(Long issueId, UpdateIssueRequest request) {
+        User currentUser = SecurityUtils.getCurrentUser();
+        Issue issue = issueRepository.findById(issueId)
+                .orElseThrow(() -> new ResourceNotFoundException("Issue", "id", issueId));
+
+        boolean isAdmin = currentUser.getAuthorities().stream().anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN"));
+        boolean isStaffAndAssignee = currentUser.getAuthorities().stream().anyMatch(auth -> auth.getAuthority().equals("ROLE_STAFF")) && issue.getAssignee() != null && Objects.equals(issue.getAssignee().getId(), currentUser.getId());
+        boolean isReporter = Objects.equals(issue.getReporter().getId(), currentUser.getId());
+
+        if (!isAdmin && !isStaffAndAssignee && !isReporter) {
+            throw new UnauthorizedException("You do not have permission to update this issue.");
+        }
+
+        if (request.getTitle() != null) {
+            issue.setTitle(request.getTitle());
+        }
+        if (request.getDescription() != null) {
+            issue.setDescription(request.getDescription());
+        }
+        if (request.getCategoryId() != null) {
+            Category category = categoryRepository.findById(request.getCategoryId())
+                    .orElseThrow(() -> new BadRequestException("Invalid Category ID: " + request.getCategoryId()));
+            issue.setCategory(category);
+        }
+        if (request.getStatusId() != null) {
+            Status status = statusRepository.findById(request.getStatusId())
+                    .orElseThrow(() -> new BadRequestException("Invalid Status ID: " + request.getStatusId()));
+            issue.setStatus(status);
+        }
+        if (request.getPriorityId() != null) {
+            Priority priority = priorityRepository.findById(request.getPriorityId())
+                    .orElseThrow(() -> new BadRequestException("Invalid Priority ID: " + request.getPriorityId()));
+            issue.setPriority(priority);
+        }
+        if (request.getAssigneeId() != null) {
+            if (request.getAssigneeId() == 0) {
+                issue.setAssignee(null);
+            } else {
+                User assignee = userRepository.findById(request.getAssigneeId())
+                        .orElseThrow(() -> new BadRequestException("Invalid Assignee ID: " + request.getAssigneeId()));
+                issue.setAssignee(assignee);
+            }
+        }
+
+        if (request.getStartDate() != null) {
+            issue.setStartDate(request.getStartDate());
+        }
+        if (request.getDueDate() != null) {
+            Instant effectiveStartDate = (request.getStartDate() != null) ? request.getStartDate() : issue.getStartDate();
+            if (effectiveStartDate != null && request.getDueDate().isBefore(effectiveStartDate)) {
+                throw new BadRequestException("Due date cannot be before the start date.");
+            }
+            issue.setDueDate(request.getDueDate());
+        }
+
+        return issueRepository.save(issue);
     }
 }
