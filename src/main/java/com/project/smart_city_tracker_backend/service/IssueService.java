@@ -319,4 +319,34 @@ public class IssueService {
 
         return issueRepository.save(issue);
     }
+
+    /**
+     * Deletes an entire issue along with its attachments from the database.
+     *
+     * @param issueId The ID of the issue to delete.
+     */
+    @Transactional
+    public void deleteIssue(Long issueId) {
+        User currentUser = SecurityUtils.getCurrentUser();
+        Issue issue = issueRepository.findById(issueId)
+                .orElseThrow(() -> new ResourceNotFoundException("Issue", "id", issueId));
+
+        boolean isReporter = Objects.equals(issue.getReporter().getId(), currentUser.getId());
+        boolean isAdmin = currentUser.getAuthorities().stream()
+                .anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN"));
+
+        if (!isReporter && !isAdmin) {
+            throw new UnauthorizedException("You do not have permission to delete this issue.");
+        }
+
+        for (Attachment attachment : issue.getAttachments()) {
+            try {
+                cloudinaryService.deleteFile(attachment.getPublicId());
+            } catch (IOException e) {
+                System.err.println("Failed to delete file from Cloudinary with public_id: " + attachment.getPublicId() + ". Error: " + e.getMessage());
+            }
+        }
+
+        issueRepository.delete(issue);
+    }
 }

@@ -335,4 +335,28 @@ public class IssueController {
 
         return ResponseEntity.ok(new IssueDetailsDTO(updatedIssue));
     }
+
+    /**
+     * Handles deleting an entire issue.
+     *
+     * @param issueId The ID of the issue to delete.
+     * @return A ResponseEntity with a confirmation message.
+     */
+    @DeleteMapping("/{issueId}")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(
+        summary = "Delete an issue",
+        description = "Permanently deletes an issue and all of its associated data. Requires ADMIN role or issue ownership.",
+        security = @SecurityRequirement(name = "bearerAuth"),
+        responses = {
+            @ApiResponse(responseCode = "200", description = "Issue deleted successfully"),
+            @ApiResponse(responseCode = "403", description = "Forbidden (user does not have permission)"),
+            @ApiResponse(responseCode = "404", description = "Issue not found")
+        }
+    )
+    public ResponseEntity<Map<String, String>> deleteIssue(@PathVariable Long issueId) {
+        issueService.deleteIssue(issueId);
+        
+        return ResponseEntity.ok(Map.of("message", "Issue " + issueId + " deleted successfully."));
+    }
 }
