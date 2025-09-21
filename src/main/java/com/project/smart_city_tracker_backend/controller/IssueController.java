@@ -1,21 +1,16 @@
 package com.project.smart_city_tracker_backend.controller;
 
 import com.project.smart_city_tracker_backend.dto.*;
-import com.project.smart_city_tracker_backend.exception.BadRequestException;
+import com.project.smart_city_tracker_backend.exception.*;
 import com.project.smart_city_tracker_backend.model.*;
 import com.project.smart_city_tracker_backend.service.*;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.*;
+import io.swagger.v3.oas.annotations.media.*;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.data.domain.*;
+import org.springframework.http.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -283,5 +278,30 @@ public class IssueController {
         issueService.deleteAttachment(issueId, attachmentId);
         
         return ResponseEntity.ok(Map.of("message", "Attachment deleted successfully."));
+    }
+
+    /**
+     * Handles fetching the full details for a single issue by its ID.
+     *
+     * @param issueId The ID of the issue to fetch.
+     * @return A ResponseEntity containing the comprehensive IssueDetailsDTO.
+     */
+    @GetMapping("/{issueId}")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(
+        summary = "Get a single issue by ID",
+        description = "Returns the full details of a single issue, including attachments and comments. Requires authentication.",
+        security = @SecurityRequirement(name = "bearerAuth"),
+        responses = {
+            @ApiResponse(responseCode = "200", description = "Successfully retrieved issue details",
+                content = @Content(mediaType = "application/json",
+                schema = @Schema(implementation = IssueDetailsDTO.class))),
+            @ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @ApiResponse(responseCode = "404", description = "Issue not found")
+        }
+    )
+    public ResponseEntity<IssueDetailsDTO> getIssueById(@PathVariable Long issueId) {
+        IssueDetailsDTO issueDetails = issueService.getIssueById(issueId);
+        return ResponseEntity.ok(issueDetails);
     }
 }

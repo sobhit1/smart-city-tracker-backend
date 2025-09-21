@@ -107,7 +107,6 @@ public class IssueDetailsDTO {
         
         if (issue.getComments() != null) {
             this.comments = issue.getComments().stream()
-                    .filter(comment -> comment.getParent() == null)
                     .sorted(Comparator.comparing(Comment::getCreatedAt))
                     .map(comment -> {
                         List<AttachmentDTO> commentAttachments = comment.getAttachments().stream()
@@ -126,7 +125,7 @@ public class IssueDetailsDTO {
                             comment.getCreatedAt(),
                             new UserSummaryDTO(comment.getAuthor().getId(), comment.getAuthor().getFullName()),
                             commentAttachments,
-                            null
+                            comment.getParent() != null ? comment.getParent().getId() : null
                         );
                     })
                     .toList();

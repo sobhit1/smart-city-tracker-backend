@@ -1,15 +1,11 @@
 package com.project.smart_city_tracker_backend.service;
 
-import com.project.smart_city_tracker_backend.dto.CreateIssueRequest;
-import com.project.smart_city_tracker_backend.dto.IssueSummaryDTO;
-import com.project.smart_city_tracker_backend.exception.BadRequestException;
-import com.project.smart_city_tracker_backend.exception.ResourceNotFoundException;
-import com.project.smart_city_tracker_backend.exception.UnauthorizedException;
+import com.project.smart_city_tracker_backend.dto.*;
+import com.project.smart_city_tracker_backend.exception.*;
 import com.project.smart_city_tracker_backend.model.*;
 import com.project.smart_city_tracker_backend.repository.*;
 import com.project.smart_city_tracker_backend.security.SecurityUtils;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,10 +14,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.persistence.criteria.Predicate;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 @Service
 public class IssueService {
@@ -240,5 +233,19 @@ public class IssueService {
         }
 
         attachmentRepository.delete(attachment);
+    }
+
+    /**
+     * Fetches a single issue by its ID and converts it to a detailed DTO.
+     *
+     * @param issueId The ID of the issue to fetch.
+     * @return An IssueDetailsDTO containing the full details of the issue.
+     */
+    @Transactional(readOnly = true)
+    public IssueDetailsDTO getIssueById(Long issueId) {
+        Issue issue = issueRepository.findById(issueId)
+                .orElseThrow(() -> new ResourceNotFoundException("Issue", "id", issueId));
+
+        return new IssueDetailsDTO(issue);
     }
 }
