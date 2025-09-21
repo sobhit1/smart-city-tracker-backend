@@ -116,4 +116,35 @@ public class CommentService {
 
         return commentRepository.save(comment);
     }
+
+    /**
+     * Deletes an existing comment.
+     *
+     * @param issueId   The ID of the parent issue.
+     * @param commentId The ID of the comment to delete.
+     */
+    @Transactional
+    public void deleteComment(Long issueId, Long commentId) {
+        User currentUser = SecurityUtils.getCurrentUser();
+
+        Comment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Comment", "id", commentId));
+
+        Issue issue = issueRepository.findById(issueId)
+                .orElseThrow(() -> new ResourceNotFoundException("Issue", "id", issueId));
+
+        if (!Objects.equals(comment.getIssue().getId(), issue.getId())) {
+            throw new BadRequestException("Comment does not belong to the specified issue.");
+        }
+
+        boolean isAuthor = Objects.equals(comment.getAuthor().getId(), currentUser.getId());
+        boolean isAdmin = currentUser.getAuthorities().stream()
+                .anyMatch(grantedAuthority -> grantedAuthority.getAuthority().equals("ROLE_ADMIN"));
+
+        if (!isAuthor && !isAdmin) {
+            throw new UnauthorizedException("You are not authorized to delete this comment.");
+        }
+
+        commentRepository.delete(comment);
+    }
 }

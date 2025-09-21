@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/issues")
@@ -166,5 +167,33 @@ public class IssueController {
         Comment updatedComment = commentService.updateComment(issueId, commentId, request);
         
         return new ResponseEntity<>(new CommentResponseDTO(updatedComment), HttpStatus.OK);
+    }
+
+    /**
+     * Handles deleting an existing comment.
+     *
+     * @param issueId   The ID of the parent issue.
+     * @param commentId The ID of the comment to delete.
+     * @return A ResponseEntity with a 204 No Content status on success.
+     */
+    @DeleteMapping("/{issueId}/comments/{commentId}")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(
+        summary = "Delete a comment",
+        description = "Deletes an existing comment. Only the original author or an admin can perform this action.",
+        security = @SecurityRequirement(name = "bearerAuth"),
+        responses = {
+            @ApiResponse(responseCode = "204", description = "Comment deleted successfully"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized (user is not the author or an admin)"),
+            @ApiResponse(responseCode = "404", description = "Issue or comment not found")
+        }
+    )
+    public ResponseEntity<Map<String, String>> deleteComment(
+            @PathVariable Long issueId,
+            @PathVariable Long commentId) {
+        
+        commentService.deleteComment(issueId, commentId);
+        
+        return ResponseEntity.ok(Map.of("message", "Comment deleted successfully."));
     }
 }
