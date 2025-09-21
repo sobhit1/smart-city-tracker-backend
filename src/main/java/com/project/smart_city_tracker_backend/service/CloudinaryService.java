@@ -36,4 +36,14 @@ public class CloudinaryService {
 
         return Map.of("url", url, "publicId", publicId);
     }
+
+    /**
+     * Deletes a file from Cloudinary using its public ID.
+     *
+     * @param publicId The unique public ID of the file to be deleted.
+     * @throws IOException If an error occurs during the deletion process.
+     */
+    public void deleteFile(String publicId) throws IOException {
+        cloudinary.uploader().destroy(publicId, ObjectUtils.emptyMap());
+    }
 }

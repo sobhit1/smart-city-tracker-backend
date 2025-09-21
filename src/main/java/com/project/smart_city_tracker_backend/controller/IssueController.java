@@ -1,15 +1,9 @@
 package com.project.smart_city_tracker_backend.controller;
 
-import com.project.smart_city_tracker_backend.dto.CommentResponseDTO;
-import com.project.smart_city_tracker_backend.dto.CreateCommentRequest;
-import com.project.smart_city_tracker_backend.dto.CreateIssueRequest;
-import com.project.smart_city_tracker_backend.dto.IssueSummaryDTO;
+import com.project.smart_city_tracker_backend.dto.*;
 import com.project.smart_city_tracker_backend.exception.BadRequestException;
-import com.project.smart_city_tracker_backend.model.Comment;
-import com.project.smart_city_tracker_backend.model.Issue;
-import com.project.smart_city_tracker_backend.service.CommentService;
-import com.project.smart_city_tracker_backend.service.IssueService;
-import com.project.smart_city_tracker_backend.dto.UpdateCommentRequest;
+import com.project.smart_city_tracker_backend.model.*;
+import com.project.smart_city_tracker_backend.service.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -195,5 +189,99 @@ public class IssueController {
         commentService.deleteComment(issueId, commentId);
         
         return ResponseEntity.ok(Map.of("message", "Comment deleted successfully."));
+    }
+
+    /**
+     * Handles adding one or more attachments directly to an existing issue.
+     *
+     * @param issueId The ID of the issue to add attachments to.
+     * @param files   The list of files to upload.
+     * @return A ResponseEntity containing a list of the newly created attachment details.
+     */
+    @PostMapping(value = "/{issueId}/attachments", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("isAuthenticated()")
+    @Operation(
+        summary = "Add attachments to an issue",
+        description = "Uploads one or more files as attachments (proofs) to an existing issue. Requires STAFF or ADMIN role or should be Reporter.",
+        security = @SecurityRequirement(name = "bearerAuth"),
+        responses = {
+            @ApiResponse(responseCode = "201", description = "Attachments added successfully"),
+            @ApiResponse(responseCode = "400", description = "Bad Request (e.g., no files provided)"),
+            @ApiResponse(responseCode = "403", description = "Forbidden (user is not a staff, admin or reporter)"),
+            @ApiResponse(responseCode = "404", description = "Issue not found")
+        }
+    )
+    public ResponseEntity<List<AttachmentResponseDTO>> addAttachmentsToIssue(
+            @PathVariable Long issueId,
+            @RequestPart("files") List<MultipartFile> files) {
+
+        if (files == null || files.isEmpty() || files.stream().allMatch(MultipartFile::isEmpty)) {
+            throw new BadRequestException("At least one file must be provided.");
+        }
+
+        List<Attachment> newAttachments = issueService.addAttachmentsToIssue(issueId, files);
+
+        List<AttachmentResponseDTO> responseDTOs = newAttachments.stream()
+                .map(AttachmentResponseDTO::new)
+                .toList();
+
+        return new ResponseEntity<>(responseDTOs, HttpStatus.CREATED);
+    }
+
+    /**
+     * Handles adding attachments to an EXISTING comment.
+     *
+     * @param issueId   The ID of the parent issue.
+     * @param commentId The ID of the comment to add attachments to.
+     * @param files     The list of files to upload.
+     * @return A ResponseEntity with a list of the newly created attachment details.
+     */
+    @PostMapping(value = "/{issueId}/comments/{commentId}/attachments", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Add attachments to an existing comment", description = "Uploads one or more files to an existing comment. Requires author or admin permissions.")
+    public ResponseEntity<List<AttachmentResponseDTO>> addAttachmentsToComment(
+            @PathVariable Long issueId,
+            @PathVariable Long commentId,
+            @RequestPart("files") List<MultipartFile> files) {
+
+        if (files == null || files.isEmpty()) {
+            throw new BadRequestException("At least one file must be provided.");
+        }
+        
+        List<Attachment> newAttachments = commentService.addAttachmentsToComment(issueId, commentId, files);
+        
+        List<AttachmentResponseDTO> responseDTOs = newAttachments.stream()
+                .map(AttachmentResponseDTO::new)
+                .toList();
+
+        return new ResponseEntity<>(responseDTOs, HttpStatus.CREATED);
+    }
+
+    /**
+     * Handles deleting an attachment from an issue or a comment.
+     *
+     * @param issueId      The ID of the parent issue (for verification).
+     * @param attachmentId The ID of the attachment to delete.
+     * @return A ResponseEntity with a confirmation message on success.
+     */
+    @DeleteMapping("/{issueId}/attachments/{attachmentId}")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(
+        summary = "Delete an attachment",
+        description = "Deletes an attachment from an issue or comment. Permissions are based on user role and ownership.",
+        security = @SecurityRequirement(name = "bearerAuth"),
+        responses = {
+            @ApiResponse(responseCode = "200", description = "Attachment deleted successfully"),
+            @ApiResponse(responseCode = "403", description = "Forbidden (user does not have permission)"),
+            @ApiResponse(responseCode = "404", description = "Issue or attachment not found")
+        }
+    )
+    public ResponseEntity<Map<String, String>> deleteAttachment(
+            @PathVariable Long issueId,
+            @PathVariable Long attachmentId) {
+
+        issueService.deleteAttachment(issueId, attachmentId);
+        
+        return ResponseEntity.ok(Map.of("message", "Attachment deleted successfully."));
     }
 }

@@ -1,14 +1,15 @@
 package com.project.smart_city_tracker_backend.service;
 
 import com.project.smart_city_tracker_backend.dto.CreateCommentRequest;
-import com.project.smart_city_tracker_backend.dto.UpdateCommentRequest; // 1. Import the new DTO
+import com.project.smart_city_tracker_backend.dto.UpdateCommentRequest;
 import com.project.smart_city_tracker_backend.exception.BadRequestException;
 import com.project.smart_city_tracker_backend.exception.ResourceNotFoundException;
-import com.project.smart_city_tracker_backend.exception.UnauthorizedException; // 2. Import the security exception
+import com.project.smart_city_tracker_backend.exception.UnauthorizedException;
 import com.project.smart_city_tracker_backend.model.Attachment;
 import com.project.smart_city_tracker_backend.model.Comment;
 import com.project.smart_city_tracker_backend.model.Issue;
 import com.project.smart_city_tracker_backend.model.User;
+import com.project.smart_city_tracker_backend.repository.AttachmentRepository;
 import com.project.smart_city_tracker_backend.repository.CommentRepository;
 import com.project.smart_city_tracker_backend.repository.IssueRepository;
 import com.project.smart_city_tracker_backend.security.SecurityUtils;
@@ -17,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -27,13 +29,16 @@ public class CommentService {
     private final CommentRepository commentRepository;
     private final IssueRepository issueRepository;
     private final CloudinaryService cloudinaryService;
+    private final AttachmentRepository attachmentRepository;
 
     public CommentService(CommentRepository commentRepository,
                           IssueRepository issueRepository,
-                          CloudinaryService cloudinaryService) {
+                          CloudinaryService cloudinaryService,
+                          AttachmentRepository attachmentRepository) {
         this.commentRepository = commentRepository;
         this.issueRepository = issueRepository;
         this.cloudinaryService = cloudinaryService;
+        this.attachmentRepository = attachmentRepository;
     }
 
     /**
@@ -146,5 +151,52 @@ public class CommentService {
         }
 
         commentRepository.delete(comment);
+    }
+
+    /**
+     * Adds one or more attachments to an existing comment.
+     *
+     * @param issueId   The ID of the parent issue (for validation).
+     * @param commentId The ID of the comment to add attachments to.
+     * @param files     The list of files to upload.
+     * @return A list of the newly created Attachment entities.
+     */
+    @Transactional
+    public List<Attachment> addAttachmentsToComment(Long issueId, Long commentId, List<MultipartFile> files) {
+        User currentUser = SecurityUtils.getCurrentUser();
+
+        Comment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Comment", "id", commentId));
+
+        if (!Objects.equals(comment.getIssue().getId(), issueId)) {
+            throw new BadRequestException("Comment does not belong to the specified issue.");
+        }
+
+        boolean isAuthor = Objects.equals(comment.getAuthor().getId(), currentUser.getId());
+        boolean isAdmin = currentUser.getAuthorities().stream()
+                .anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN"));
+
+        if (!isAuthor && !isAdmin) {
+            throw new UnauthorizedException("You do not have permission to add attachments to this comment.");
+        }
+
+        List<Attachment> newAttachments = new ArrayList<>();
+        for (MultipartFile file : files) {
+            try {
+                Map<String, String> uploadResult = cloudinaryService.uploadFile(file);
+                Attachment attachment = new Attachment(
+                        uploadResult.get("url"),
+                        uploadResult.get("publicId"),
+                        file.getOriginalFilename(),
+                        file.getContentType(),
+                        comment
+                );
+                newAttachments.add(attachment);
+            } catch (IOException e) {
+                throw new BadRequestException("Failed to upload file: " + file.getOriginalFilename(), e);
+            }
+        }
+        
+        return attachmentRepository.saveAll(newAttachments);
     }
 }
