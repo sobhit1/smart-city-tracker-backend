@@ -1,8 +1,10 @@
 package com.project.smart_city_tracker_backend.service;
 
 import com.project.smart_city_tracker_backend.dto.CreateCommentRequest;
+import com.project.smart_city_tracker_backend.dto.UpdateCommentRequest; // 1. Import the new DTO
 import com.project.smart_city_tracker_backend.exception.BadRequestException;
 import com.project.smart_city_tracker_backend.exception.ResourceNotFoundException;
+import com.project.smart_city_tracker_backend.exception.UnauthorizedException; // 2. Import the security exception
 import com.project.smart_city_tracker_backend.model.Attachment;
 import com.project.smart_city_tracker_backend.model.Comment;
 import com.project.smart_city_tracker_backend.model.Issue;
@@ -17,6 +19,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Service
 public class CommentService {
@@ -81,5 +84,36 @@ public class CommentService {
         }
 
         return commentRepository.save(newComment);
+    }
+
+    /**
+     * Updates the text of an existing comment.
+     *
+     * @param issueId   The ID of the parent issue.
+     * @param commentId The ID of the comment to update.
+     * @param request   The DTO containing the new text for the comment.
+     * @return The updated and saved Comment entity.
+     */
+    @Transactional
+    public Comment updateComment(Long issueId, Long commentId, UpdateCommentRequest request) {
+        User currentUser = SecurityUtils.getCurrentUser();
+
+        Comment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Comment", "id", commentId));
+
+        Issue issue = issueRepository.findById(issueId)
+                .orElseThrow(() -> new ResourceNotFoundException("Issue", "id", issueId));
+
+        if (!Objects.equals(comment.getIssue().getId(), issue.getId())) {
+            throw new BadRequestException("Comment does not belong to the specified issue.");
+        }
+
+        if (!Objects.equals(comment.getAuthor().getId(), currentUser.getId())) {
+            throw new UnauthorizedException("You are not authorized to edit this comment.");
+        }
+
+        comment.setText(request.getText());
+
+        return commentRepository.save(comment);
     }
 }

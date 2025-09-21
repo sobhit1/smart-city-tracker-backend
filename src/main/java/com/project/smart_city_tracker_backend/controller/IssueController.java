@@ -9,6 +9,7 @@ import com.project.smart_city_tracker_backend.model.Comment;
 import com.project.smart_city_tracker_backend.model.Issue;
 import com.project.smart_city_tracker_backend.service.CommentService;
 import com.project.smart_city_tracker_backend.service.IssueService;
+import com.project.smart_city_tracker_backend.dto.UpdateCommentRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -134,5 +135,36 @@ public class IssueController {
         Comment newComment = commentService.addComment(issueId, request, files);
         
         return new ResponseEntity<>(new CommentResponseDTO(newComment), HttpStatus.CREATED);
+    }
+
+    /**
+     * Handles updating the text of an existing comment.
+     *
+     * @param issueId The ID of the parent issue.
+     * @param commentId The ID of the comment to update.
+     * @param request The request body containing the new comment text.
+     * @return A ResponseEntity containing the updated comment.
+     */
+    @PutMapping("/{issueId}/comments/{commentId}")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(
+        summary = "Update a comment",
+        description = "Updates the text of an existing comment. Only the original author can perform this action.",
+        security = @SecurityRequirement(name = "bearerAuth"),
+        responses = {
+            @ApiResponse(responseCode = "200", description = "Comment updated successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = CommentResponseDTO.class))),
+            @ApiResponse(responseCode = "400", description = "Bad Request (e.g., validation error)"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized (user is not the author)"),
+            @ApiResponse(responseCode = "404", description = "Issue or comment not found")
+        }
+    )
+    public ResponseEntity<CommentResponseDTO> updateComment(
+            @PathVariable Long issueId,
+            @PathVariable Long commentId,
+            @Valid @RequestBody UpdateCommentRequest request) {
+        
+        Comment updatedComment = commentService.updateComment(issueId, commentId, request);
+        
+        return new ResponseEntity<>(new CommentResponseDTO(updatedComment), HttpStatus.OK);
     }
 }
