@@ -51,11 +51,12 @@ public class SmartCityTrackerBackendApplication {
             }
             if (priorityRepository.count() == 0) {
                 priorityRepository.saveAll(List.of(
-                        new Priority(null, "Highest"),
-                        new Priority(null, "High"),
-                        new Priority(null, "Medium"),
-                        new Priority(null, "Low"),
-                        new Priority(null, "Lowest")));
+                    new Priority(null, "Highest", 5),
+                    new Priority(null, "High", 4),
+                    new Priority(null, "Medium", 3),
+                    new Priority(null, "Low", 2),
+                    new Priority(null, "Lowest", 1)
+                ));
             }
         };
     }

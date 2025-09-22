@@ -62,30 +62,33 @@ public class IssueController {
     }
 
     /**
-     * Handles fetching a paginated and filtered list of all issues for the dashboard.
+     * Handles fetching a paginated list of issues using a combination of simple and advanced filters.
      *
-     * @param pageable The pagination information (page, size, sort) provided by Spring.
-     * @param search   Optional search term to filter issues by title or description.
-     * @param category Optional category to filter issues by.
-     * @param status   Optional status to filter issues by.
+     * @param pageable        The pagination information.
+     * @param search          Optional simple search term.
+     * @param category        Optional simple category filter.
+     * @param status          Optional simple status filter.
+     * @param reportedBy      Optional filter for issues reported by the current user ("me").
+     * @param assignedTo      Optional filter for issues assigned to the current user ("me").
+     * @param advancedFilters Optional list of advanced filter strings ("field:operator:value").
      * @return A ResponseEntity containing a Page of IssueSummaryDTOs.
      */
     @GetMapping
     @PreAuthorize("isAuthenticated()")
     @Operation(
         summary = "Get all issues (paginated and filtered)",
-        description = "Returns a paginated list of issues, with optional filters for search, category, and status.",
+        description = "Returns a paginated list of issues, with support for both simple and advanced filters.",
         security = @SecurityRequirement(name = "bearerAuth"),
         parameters = {
             @Parameter(name = "page", description = "Page number (0..N)"),
             @Parameter(name = "size", description = "Number of elements per page"),
-            @Parameter(name = "sort", description = "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported."),
-            @Parameter(name = "reportedBy", description = "Filter issues by the current user. Set to 'me'."),
-            @Parameter(name = "assignedTo", description = "Filter issues assigned to the current user. Set to 'me'. (Requires STAFF or ADMIN role)")
-        },
-        responses = {
-            @ApiResponse(responseCode = "200", description = "Successfully retrieved list of issues"),
-            @ApiResponse(responseCode = "401", description = "Unauthorized")
+            @Parameter(name = "sort", description = "Sorting criteria (e.g., 'priority,desc')"),
+            @Parameter(name = "search", description = "Simple search term for title/description"),
+            @Parameter(name = "category", description = "Simple filter by category name"),
+            @Parameter(name = "status", description = "Simple filter by status name"),
+            @Parameter(name = "reportedBy", description = "Filter issues reported by the current user. Set to 'me'."),
+            @Parameter(name = "assignedTo", description = "Filter issues assigned to the current user. Set to 'me'."),
+            @Parameter(name = "filters", description = "List of advanced filters (e.g., 'title:contains:pothole')")
         }
     )
     public ResponseEntity<Page<IssueSummaryDTO>> getAllIssues(
@@ -94,9 +97,10 @@ public class IssueController {
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String reportedBy,
-            @RequestParam(required = false) String assignedTo) {
+            @RequestParam(required = false) String assignedTo,
+            @RequestParam(name = "filters", required = false) List<String> advancedFilters) {
         
-        Page<IssueSummaryDTO> issuesPage = issueService.getAllIssues(pageable, search, category, status, reportedBy, assignedTo);
+        Page<IssueSummaryDTO> issuesPage = issueService.getAllIssues(pageable, search, category, status, reportedBy, assignedTo, advancedFilters);
         return ResponseEntity.ok(issuesPage);
     }
     

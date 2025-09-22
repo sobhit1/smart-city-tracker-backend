@@ -5,6 +5,8 @@ import com.project.smart_city_tracker_backend.exception.*;
 import com.project.smart_city_tracker_backend.model.*;
 import com.project.smart_city_tracker_backend.repository.*;
 import com.project.smart_city_tracker_backend.security.SecurityUtils;
+import com.project.smart_city_tracker_backend.utils.FilterParser;
+
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -12,10 +14,12 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.Predicate;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class IssueService {
@@ -104,7 +108,9 @@ public class IssueService {
      * @return A Page of IssueSummaryDTOs.
      */
     @Transactional(readOnly = true)
-    public Page<IssueSummaryDTO> getAllIssues(Pageable pageable, String search, String category, String status, String reportedBy, String assignedTo) {
+    public Page<IssueSummaryDTO> getAllIssues(Pageable pageable, String search, String category, String status, String reportedBy, String assignedTo, List<String> advancedFilters) {
+        Pageable correctedPageable = remapSortProperty(pageable, "priority", "priority.sortOrder");
+
         if ("me".equalsIgnoreCase(assignedTo)) {
             User currentUser = SecurityUtils.getCurrentUser();
             boolean isStaffOrAdmin = currentUser.getAuthorities().stream()
@@ -115,10 +121,8 @@ public class IssueService {
             }
         }
 
-        Specification<Issue> spec = buildSpecification(search, category, status, reportedBy, assignedTo);
-
-        Page<Issue> issuesPage = issueRepository.findAll(spec, pageable);
-
+        Specification<Issue> spec = buildSpecification(search, category, status, reportedBy, assignedTo, advancedFilters);
+        Page<Issue> issuesPage = issueRepository.findAll(spec, correctedPageable);
         return issuesPage.map(IssueSummaryDTO::new);
     }
 
@@ -126,7 +130,7 @@ public class IssueService {
      * A private helper method to build a dynamic JPA Specification based on the provided filters.
      * This keeps the main service method clean and readable.
      */
-    private Specification<Issue> buildSpecification(String search, String category, String status, String reportedBy, String assignedTo) {
+    private Specification<Issue> buildSpecification(String search, String category, String status, String reportedBy, String assignedTo, List<String> advancedFilters) {
         return (root, query, criteriaBuilder) -> {
             List<Predicate> predicates = new ArrayList<>();
 
@@ -154,8 +158,70 @@ public class IssueService {
                 predicates.add(criteriaBuilder.equal(root.get("assignee").get("id"), currentUser.getId()));
             }
 
+            List<FilterParser.FilterCriteria> criteriaList = FilterParser.parse(advancedFilters);
+            for (FilterParser.FilterCriteria criteria : criteriaList) {
+                String field = criteria.getField();
+                String value = criteria.getValue();
+                
+                if (field.equalsIgnoreCase("priority")) {
+                    Join<Object, Object> join = root.join(field);
+                    predicates.add(criteriaBuilder.equal(join.get("name"), value));
+                } else {
+                    switch (criteria.getOperator().toLowerCase()) {
+                        case "equals":
+                            predicates.add(criteriaBuilder.equal(root.get(field), value));
+                            break;
+                        case "notequal":
+                            predicates.add(criteriaBuilder.notEqual(root.get(field), value));
+                            break;
+                        case "contains":
+                            predicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get(field)), "%" + value.toLowerCase() + "%"));
+                            break;
+                        case "doesnotcontain":
+                            predicates.add(criteriaBuilder.notLike(criteriaBuilder.lower(root.get(field)), "%" + value.toLowerCase() + "%"));
+                            break;
+                        case "startswith":
+                            predicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get(field)), value.toLowerCase() + "%"));
+                            break;
+                        case "endswith":
+                             predicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get(field)), "%" + value.toLowerCase()));
+                            break;
+                        case "isempty":
+                             predicates.add(criteriaBuilder.or(
+                                 criteriaBuilder.isNull(root.get(field)),
+                                 criteriaBuilder.equal(root.get(field), "")
+                             ));
+                             break;
+                        case "isnotempty":
+                             predicates.add(criteriaBuilder.and(
+                                 criteriaBuilder.isNotNull(root.get(field)),
+                                 criteriaBuilder.notEqual(root.get(field), "")
+                             ));
+                             break;
+                        default:
+                            throw new BadRequestException("Unsupported filter operator: " + criteria.getOperator());
+                    }
+                }
+            }
+
             return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
         };
+    }
+
+    /**
+     * A utility to remap a sort property for logical sorting (e.g., priority).
+     */
+    private Pageable remapSortProperty(Pageable pageable, String fromProperty, String toProperty) {
+        List<Sort.Order> correctedOrders = pageable.getSort().stream()
+            .map(order -> {
+                if (order.getProperty().equalsIgnoreCase(fromProperty)) {
+                    return new Sort.Order(order.getDirection(), toProperty);
+                }
+                return order;
+            })
+            .collect(Collectors.toList());
+        Sort correctedSort = Sort.by(correctedOrders);
+        return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), correctedSort);
     }
 
     /**

@@ -19,4 +19,7 @@ public class Priority {
 
     @Column(nullable = false, unique = true)
     private String name;
+
+    @Column(name = "sort_order", nullable = false)
+    private Integer sortOrder;
 }
