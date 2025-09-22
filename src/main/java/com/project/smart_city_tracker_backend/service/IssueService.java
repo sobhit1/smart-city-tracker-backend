@@ -104,8 +104,18 @@ public class IssueService {
      * @return A Page of IssueSummaryDTOs.
      */
     @Transactional(readOnly = true)
-    public Page<IssueSummaryDTO> getAllIssues(Pageable pageable, String search, String category, String status, String reportedBy) {
-        Specification<Issue> spec = buildSpecification(search, category, status, reportedBy);
+    public Page<IssueSummaryDTO> getAllIssues(Pageable pageable, String search, String category, String status, String reportedBy, String assignedTo) {
+        if ("me".equalsIgnoreCase(assignedTo)) {
+            User currentUser = SecurityUtils.getCurrentUser();
+            boolean isStaffOrAdmin = currentUser.getAuthorities().stream()
+                    .anyMatch(auth -> auth.getAuthority().equals("ROLE_STAFF") || auth.getAuthority().equals("ROLE_ADMIN"));
+            
+            if (!isStaffOrAdmin) {
+                throw new UnauthorizedException("You do not have permission to use the 'assignedTo' filter.");
+            }
+        }
+
+        Specification<Issue> spec = buildSpecification(search, category, status, reportedBy, assignedTo);
 
         Page<Issue> issuesPage = issueRepository.findAll(spec, pageable);
 
@@ -116,7 +126,7 @@ public class IssueService {
      * A private helper method to build a dynamic JPA Specification based on the provided filters.
      * This keeps the main service method clean and readable.
      */
-    private Specification<Issue> buildSpecification(String search, String category, String status, String reportedBy) {
+    private Specification<Issue> buildSpecification(String search, String category, String status, String reportedBy, String assignedTo) {
         return (root, query, criteriaBuilder) -> {
             List<Predicate> predicates = new ArrayList<>();
 
@@ -137,6 +147,11 @@ public class IssueService {
             if ("me".equalsIgnoreCase(reportedBy)) {
                 User currentUser = SecurityUtils.getCurrentUser();
                 predicates.add(criteriaBuilder.equal(root.get("reporter").get("id"), currentUser.getId()));
+            }
+
+            if ("me".equalsIgnoreCase(assignedTo)) {
+                User currentUser = SecurityUtils.getCurrentUser();
+                predicates.add(criteriaBuilder.equal(root.get("assignee").get("id"), currentUser.getId()));
             }
 
             return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
