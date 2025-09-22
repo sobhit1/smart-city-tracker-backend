@@ -79,7 +79,8 @@ public class IssueController {
         parameters = {
             @Parameter(name = "page", description = "Page number (0..N)"),
             @Parameter(name = "size", description = "Number of elements per page"),
-            @Parameter(name = "sort", description = "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.")
+            @Parameter(name = "sort", description = "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported."),
+            @Parameter(name = "reportedBy", description = "Filter issues by the current user. Set to 'me'.")
         },
         responses = {
             @ApiResponse(responseCode = "200", description = "Successfully retrieved list of issues"),
@@ -90,9 +91,10 @@ public class IssueController {
             Pageable pageable,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String category,
-            @RequestParam(required = false) String status) {
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String reportedBy) {
         
-        Page<IssueSummaryDTO> issuesPage = issueService.getAllIssues(pageable, search, category, status);
+        Page<IssueSummaryDTO> issuesPage = issueService.getAllIssues(pageable, search, category, status, reportedBy);
         return ResponseEntity.ok(issuesPage);
     }
     

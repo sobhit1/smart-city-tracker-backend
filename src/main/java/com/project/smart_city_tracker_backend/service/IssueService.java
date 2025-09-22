@@ -104,8 +104,8 @@ public class IssueService {
      * @return A Page of IssueSummaryDTOs.
      */
     @Transactional(readOnly = true)
-    public Page<IssueSummaryDTO> getAllIssues(Pageable pageable, String search, String category, String status) {
-        Specification<Issue> spec = buildSpecification(search, category, status);
+    public Page<IssueSummaryDTO> getAllIssues(Pageable pageable, String search, String category, String status, String reportedBy) {
+        Specification<Issue> spec = buildSpecification(search, category, status, reportedBy);
 
         Page<Issue> issuesPage = issueRepository.findAll(spec, pageable);
 
@@ -116,7 +116,7 @@ public class IssueService {
      * A private helper method to build a dynamic JPA Specification based on the provided filters.
      * This keeps the main service method clean and readable.
      */
-    private Specification<Issue> buildSpecification(String search, String category, String status) {
+    private Specification<Issue> buildSpecification(String search, String category, String status, String reportedBy) {
         return (root, query, criteriaBuilder) -> {
             List<Predicate> predicates = new ArrayList<>();
 
@@ -132,6 +132,11 @@ public class IssueService {
 
             if (StringUtils.hasText(status) && !status.equalsIgnoreCase("All")) {
                 predicates.add(criteriaBuilder.equal(root.join("status").get("name"), status));
+            }
+
+            if ("me".equalsIgnoreCase(reportedBy)) {
+                User currentUser = SecurityUtils.getCurrentUser();
+                predicates.add(criteriaBuilder.equal(root.get("reporter").get("id"), currentUser.getId()));
             }
 
             return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
