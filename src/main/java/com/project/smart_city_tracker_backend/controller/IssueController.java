@@ -44,21 +44,20 @@ public class IssueController {
         description = "Creates a new issue with details and at least one file attachment. Requires authentication.",
         security = @SecurityRequirement(name = "bearerAuth"),
         responses = {
-            @ApiResponse(responseCode = "201", description = "Issue created successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = Issue.class))),
-            @ApiResponse(responseCode = "400", description = "Bad Request (e.g., validation error, no files attached)"),
+            @ApiResponse(responseCode = "201", description = "Issue created successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = IssueDetailsDTO.class))),
+            @ApiResponse(responseCode = "400", description = "Bad Request"),
             @ApiResponse(responseCode = "401", description = "Unauthorized")
         }
     )
-    public ResponseEntity<Issue> createIssue(
+    public ResponseEntity<IssueDetailsDTO> createIssue(
             @RequestPart("issueData") @Valid CreateIssueRequest request,
             @RequestPart("files") List<MultipartFile> files) {
 
         if (files == null || files.isEmpty() || files.stream().allMatch(MultipartFile::isEmpty)) {
             throw new BadRequestException("At least one file attachment is required.");
         }
-
-        Issue newIssue = issueService.createIssue(request, files);
-        return new ResponseEntity<>(newIssue, HttpStatus.CREATED);
+        IssueDetailsDTO newIssueDTO = issueService.createIssue(request, files);
+        return new ResponseEntity<>(newIssueDTO, HttpStatus.CREATED);
     }
 
     /**
@@ -327,21 +326,18 @@ public class IssueController {
         description = "Updates details of an existing issue (e.g., status, assignee, title). Requires Admin, Assignee, or Reporter permissions.",
         security = @SecurityRequirement(name = "bearerAuth"),
         responses = {
-            @ApiResponse(responseCode = "200", description = "Issue updated successfully",
-                content = @Content(mediaType = "application/json",
-                schema = @Schema(implementation = IssueDetailsDTO.class))),
-            @ApiResponse(responseCode = "400", description = "Bad Request (e.g., validation error, invalid ID)"),
-            @ApiResponse(responseCode = "403", description = "Forbidden (user does not have permission)"),
-            @ApiResponse(responseCode = "404", description = "Issue not found")
+            @ApiResponse(responseCode = "200", description = "Issue updated successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = IssueDetailsDTO.class))),
+            @ApiResponse(responseCode = "400", description = "Bad Request"),
+            @ApiResponse(responseCode = "403", description = "Forbidden"),
+            @ApiResponse(responseCode = "404", description = "Not Found")
         }
     )
     public ResponseEntity<IssueDetailsDTO> updateIssue(
             @PathVariable Long issueId,
             @Valid @RequestBody UpdateIssueRequest request) {
-
-        Issue updatedIssue = issueService.updateIssue(issueId, request);
-
-        return ResponseEntity.ok(new IssueDetailsDTO(updatedIssue));
+        
+        IssueDetailsDTO updatedIssueDTO = issueService.updateIssue(issueId, request);
+        return ResponseEntity.ok(updatedIssueDTO);
     }
 
     /**

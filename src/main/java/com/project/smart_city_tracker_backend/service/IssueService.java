@@ -53,7 +53,7 @@ public class IssueService {
      * @return The newly created and saved Issue entity.
      */
     @Transactional
-    public Issue createIssue(CreateIssueRequest request, List<MultipartFile> files) {
+    public IssueDetailsDTO createIssue(CreateIssueRequest request, List<MultipartFile> files) {
         if (files == null || files.isEmpty()) {
             throw new BadRequestException("Cannot create an issue without at least one attachment.");
         }
@@ -95,7 +95,9 @@ public class IssueService {
             }
         }
 
-        return issueRepository.save(issue);
+        Issue savedIssue = issueRepository.save(issue);
+        
+        return new IssueDetailsDTO(savedIssue);
     }
 
     /**
@@ -348,7 +350,7 @@ public class IssueService {
      * @return The updated and saved Issue entity.
      */
     @Transactional
-    public Issue updateIssue(Long issueId, UpdateIssueRequest request) {
+    public IssueDetailsDTO updateIssue(Long issueId, UpdateIssueRequest request) {
         User currentUser = SecurityUtils.getCurrentUser();
         Issue issue = issueRepository.findById(issueId)
                 .orElseThrow(() -> new ResourceNotFoundException("Issue", "id", issueId));
@@ -403,7 +405,9 @@ public class IssueService {
             issue.setDueDate(request.getDueDate());
         }
 
-        return issueRepository.save(issue);
+        Issue updatedIssue = issueRepository.save(issue);
+
+        return new IssueDetailsDTO(updatedIssue);
     }
 
     /**
