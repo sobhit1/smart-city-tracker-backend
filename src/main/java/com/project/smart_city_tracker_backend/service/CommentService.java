@@ -1,27 +1,17 @@
 package com.project.smart_city_tracker_backend.service;
 
-import com.project.smart_city_tracker_backend.dto.CreateCommentRequest;
-import com.project.smart_city_tracker_backend.dto.UpdateCommentRequest;
-import com.project.smart_city_tracker_backend.exception.BadRequestException;
-import com.project.smart_city_tracker_backend.exception.ResourceNotFoundException;
-import com.project.smart_city_tracker_backend.exception.UnauthorizedException;
-import com.project.smart_city_tracker_backend.model.Attachment;
-import com.project.smart_city_tracker_backend.model.Comment;
-import com.project.smart_city_tracker_backend.model.Issue;
-import com.project.smart_city_tracker_backend.model.User;
-import com.project.smart_city_tracker_backend.repository.AttachmentRepository;
-import com.project.smart_city_tracker_backend.repository.CommentRepository;
-import com.project.smart_city_tracker_backend.repository.IssueRepository;
+import com.project.smart_city_tracker_backend.dto.*;
+import com.project.smart_city_tracker_backend.exception.*;
+import com.project.smart_city_tracker_backend.model.*;
+import com.project.smart_city_tracker_backend.repository.*;
 import com.project.smart_city_tracker_backend.security.SecurityUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class CommentService {
@@ -43,6 +33,7 @@ public class CommentService {
 
     /**
      * Creates a new comment, handles replies, uploads attachments, and saves it to the database.
+     * Any authenticated user can create a comment.
      *
      * @param issueId The ID of the issue to which the comment is being added.
      * @param request The DTO containing the comment's text and optional parentId.
@@ -50,7 +41,7 @@ public class CommentService {
      * @return The newly created and saved Comment entity.
      */
     @Transactional
-    public Comment addComment(Long issueId, CreateCommentRequest request, List<MultipartFile> files) {
+    public CommentResponseDTO addComment(Long issueId, CreateCommentRequest request, List<MultipartFile> files) {
         Issue issue = issueRepository.findById(issueId)
                 .orElseThrow(() -> new ResourceNotFoundException("Issue", "id", issueId));
 
@@ -87,12 +78,14 @@ public class CommentService {
                 }
             }
         }
-
-        return commentRepository.save(newComment);
+        
+        Comment savedComment = commentRepository.save(newComment);
+        return new CommentResponseDTO(savedComment);
     }
 
     /**
      * Updates the text of an existing comment.
+     * Only the comment author can update their own comment.
      *
      * @param issueId   The ID of the parent issue.
      * @param commentId The ID of the comment to update.
@@ -100,7 +93,7 @@ public class CommentService {
      * @return The updated and saved Comment entity.
      */
     @Transactional
-    public Comment updateComment(Long issueId, Long commentId, UpdateCommentRequest request) {
+    public CommentResponseDTO updateComment(Long issueId, Long commentId, UpdateCommentRequest request) {
         User currentUser = SecurityUtils.getCurrentUser();
 
         Comment comment = commentRepository.findById(commentId)
@@ -118,12 +111,15 @@ public class CommentService {
         }
 
         comment.setText(request.getText());
-
-        return commentRepository.save(comment);
+        
+        Comment updatedComment = commentRepository.save(comment);
+        return new CommentResponseDTO(updatedComment);
     }
 
     /**
      * Deletes an existing comment.
+     * The comment author can delete their own comment.
+     * Admins can delete any comment.
      *
      * @param issueId   The ID of the parent issue.
      * @param commentId The ID of the comment to delete.
@@ -155,6 +151,7 @@ public class CommentService {
 
     /**
      * Adds one or more attachments to an existing comment.
+     * Only the comment author can add attachments.
      *
      * @param issueId   The ID of the parent issue (for validation).
      * @param commentId The ID of the comment to add attachments to.
@@ -162,7 +159,7 @@ public class CommentService {
      * @return A list of the newly created Attachment entities.
      */
     @Transactional
-    public List<Attachment> addAttachmentsToComment(Long issueId, Long commentId, List<MultipartFile> files) {
+    public List<AttachmentResponseDTO> addAttachmentsToComment(Long issueId, Long commentId, List<MultipartFile> files) {
         User currentUser = SecurityUtils.getCurrentUser();
 
         Comment comment = commentRepository.findById(commentId)
@@ -173,10 +170,8 @@ public class CommentService {
         }
 
         boolean isAuthor = Objects.equals(comment.getAuthor().getId(), currentUser.getId());
-        boolean isAdmin = currentUser.getAuthorities().stream()
-                .anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN"));
 
-        if (!isAuthor && !isAdmin) {
+        if (!isAuthor) {
             throw new UnauthorizedException("You do not have permission to add attachments to this comment.");
         }
 
@@ -193,10 +188,14 @@ public class CommentService {
                 );
                 newAttachments.add(attachment);
             } catch (IOException e) {
-                throw new BadRequestException("Failed to upload file: " + file.getOriginalFilename(), e);
+                throw new BadRequestException("Failed to upload file for comment: " + file.getOriginalFilename(), e);
             }
         }
         
-        return attachmentRepository.saveAll(newAttachments);
+        List<Attachment> savedAttachments = attachmentRepository.saveAll(newAttachments);
+        
+        return savedAttachments.stream()
+                .map(AttachmentResponseDTO::new)
+                .collect(Collectors.toList());
     }
 }

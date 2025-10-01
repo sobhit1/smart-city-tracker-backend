@@ -129,9 +129,9 @@ public class IssueController {
             @RequestPart("commentData") @Valid CreateCommentRequest request,
             @RequestPart(value = "files", required = false) List<MultipartFile> files) {
         
-        Comment newComment = commentService.addComment(issueId, request, files);
-        
-        return new ResponseEntity<>(new CommentResponseDTO(newComment), HttpStatus.CREATED);
+        CommentResponseDTO newCommentDTO = commentService.addComment(issueId, request, files);
+
+        return new ResponseEntity<>(newCommentDTO, HttpStatus.CREATED);
     }
 
     /**
@@ -160,9 +160,9 @@ public class IssueController {
             @PathVariable Long commentId,
             @Valid @RequestBody UpdateCommentRequest request) {
         
-        Comment updatedComment = commentService.updateComment(issueId, commentId, request);
-        
-        return new ResponseEntity<>(new CommentResponseDTO(updatedComment), HttpStatus.OK);
+        CommentResponseDTO updatedCommentDTO = commentService.updateComment(issueId, commentId, request);
+
+        return ResponseEntity.ok(updatedCommentDTO);
     }
 
     /**
@@ -250,13 +250,9 @@ public class IssueController {
             throw new BadRequestException("At least one file must be provided.");
         }
         
-        List<Attachment> newAttachments = commentService.addAttachmentsToComment(issueId, commentId, files);
+        List<AttachmentResponseDTO> newAttachmentsDTOs = commentService.addAttachmentsToComment(issueId, commentId, files);
         
-        List<AttachmentResponseDTO> responseDTOs = newAttachments.stream()
-                .map(AttachmentResponseDTO::new)
-                .toList();
-
-        return new ResponseEntity<>(responseDTOs, HttpStatus.CREATED);
+        return new ResponseEntity<>(newAttachmentsDTOs, HttpStatus.CREATED);
     }
 
     /**

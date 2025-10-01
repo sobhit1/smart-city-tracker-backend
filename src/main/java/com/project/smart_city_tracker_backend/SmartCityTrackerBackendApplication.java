@@ -1,13 +1,7 @@
 package com.project.smart_city_tracker_backend;
 
-import com.project.smart_city_tracker_backend.model.Category;
-import com.project.smart_city_tracker_backend.model.Priority;
-import com.project.smart_city_tracker_backend.model.Role;
-import com.project.smart_city_tracker_backend.model.Status;
-import com.project.smart_city_tracker_backend.repository.CategoryRepository;
-import com.project.smart_city_tracker_backend.repository.PriorityRepository;
-import com.project.smart_city_tracker_backend.repository.RoleRepository;
-import com.project.smart_city_tracker_backend.repository.StatusRepository;
+import com.project.smart_city_tracker_backend.model.*;
+import com.project.smart_city_tracker_backend.repository.*;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

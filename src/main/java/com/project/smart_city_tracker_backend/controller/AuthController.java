@@ -1,16 +1,14 @@
 package com.project.smart_city_tracker_backend.controller;
 
-import com.project.smart_city_tracker_backend.dto.AuthResponse;
-import com.project.smart_city_tracker_backend.dto.LoginRequest;
-import com.project.smart_city_tracker_backend.dto.RegisterRequest;
+import com.project.smart_city_tracker_backend.dto.*;
 import com.project.smart_city_tracker_backend.service.AuthService;
+import com.project.smart_city_tracker_backend.exception.UnauthorizedException;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import jakarta.servlet.http.Cookie;
-import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.*;
 import jakarta.validation.Valid;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -18,16 +16,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
-
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
 
     private final AuthService authService;
-
-    @Value("${app.jwt.access-expiration-ms}")
-    private int jwtAccessExpirationMs;
 
     @Value("${app.jwt.refresh-expiration-ms}")
     private int jwtRefreshExpirationMs;
@@ -53,7 +46,7 @@ public class AuthController {
 
         AuthResponse authResponse = authService.loginUser(loginRequest);
 
-        String refreshToken = authService.generateRefreshToken(loginRequest.getUserName());
+        String refreshToken = authService.generateRefreshToken(authResponse.getUserName());
         setCookie(response, REFRESH_TOKEN_COOKIE, refreshToken, jwtRefreshExpirationMs);
 
         return ResponseEntity.ok(authResponse);
@@ -70,7 +63,7 @@ public class AuthController {
 
         AuthResponse authResponse = authService.registerUser(registerRequest);
 
-        String refreshToken = authService.generateRefreshToken(registerRequest.getUserName());
+        String refreshToken = authService.generateRefreshToken(authResponse.getUserName());
         setCookie(response, REFRESH_TOKEN_COOKIE, refreshToken, jwtRefreshExpirationMs);
 
         return new ResponseEntity<>(authResponse, HttpStatus.CREATED);
@@ -81,15 +74,11 @@ public class AuthController {
      */
     @PostMapping("/refresh")
     @Operation(summary = "Refresh access token", description = "Generate a new access token using refresh token from cookies.")
-    public ResponseEntity<Object> refreshAccessToken(
+    public ResponseEntity<AuthResponse> refreshAccessToken(
         @CookieValue(value = REFRESH_TOKEN_COOKIE, required = false) String refreshToken) {
 
         if (refreshToken == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(Map.of(
-                    "message", "Refresh token not found. Please login again.",
-                    "error", "Unauthorized"
-                ));
+            throw new UnauthorizedException("Refresh token not found. Please login again.");
         }
 
         AuthResponse authResponse = authService.refreshAccessToken(refreshToken);

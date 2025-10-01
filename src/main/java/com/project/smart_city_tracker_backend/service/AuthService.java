@@ -18,7 +18,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashSet;
+import java.util.*;
 
 @Service
 public class AuthService {
@@ -42,8 +42,7 @@ public class AuthService {
     }
 
     /**
-     * Authenticate user and return AuthResponse with access token.
-     * Refresh token is set in HttpOnly cookie by controller.
+     * Authenticates a user and returns a complete AuthResponse.
      */
     public AuthResponse loginUser(LoginRequest loginRequest) {
         try {
@@ -67,7 +66,7 @@ public class AuthService {
     }
 
     /**
-     * Register new user
+     * Registers a new user and returns a complete AuthResponse.
      */
     @Transactional
     public AuthResponse registerUser(RegisterRequest registerRequest) {
@@ -100,10 +99,9 @@ public class AuthService {
                         "Default role 'ROLE_CITIZEN' is not configured in the database."
                 ));
 
-        if (user.getRoles() == null) {
-            user.setRoles(new HashSet<>());
-        }
-        user.getRoles().add(userRole);
+        Set<Role> roles = new HashSet<>();
+        roles.add(userRole);
+        user.setRoles(roles);
 
         userRepository.save(user);
 
@@ -113,8 +111,7 @@ public class AuthService {
     }
 
     /**
-     * Generate a refresh token string for a given username.
-     * This is used by controller to set HttpOnly cookie.
+     * Generates a refresh token for a given username.
      */
     public String generateRefreshToken(String username) {
         User user = userRepository.findByUserName(username)
@@ -123,13 +120,12 @@ public class AuthService {
     }
 
     /**
-     * Refresh access token using valid refresh token.
-     * Only access token is returned; refresh token stays in cookie.
+     * Refreshes an access token and returns a complete AuthResponse, including the user's ID.
      */
     public AuthResponse refreshAccessToken(String refreshToken) {
         try {
             if (!jwtTokenProvider.validateToken(refreshToken)) {
-                throw new BadRequestException("Invalid refresh token");
+                throw new BadRequestException("Invalid or expired refresh token.");
             }
 
             String username = jwtTokenProvider.getUserNameFromJwt(refreshToken);

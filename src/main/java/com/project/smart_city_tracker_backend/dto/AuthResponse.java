@@ -13,12 +13,14 @@ import java.util.List;
 @NoArgsConstructor
 public class AuthResponse {
 
+    private Long id;
     private String fullName;
     private String userName;
     private List<String> roles;
     private String accessToken;
 
     public AuthResponse(User user, String accessToken) {
+        this.id = user.getId();
         this.fullName = user.getFullName();
         this.userName = user.getUsername();
         this.roles = user.getAuthorities().stream()
