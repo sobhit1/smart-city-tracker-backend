@@ -1,6 +1,7 @@
 package com.project.smart_city_tracker_backend.model;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Pattern;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -30,6 +31,10 @@ public class User implements UserDetails {
     @Column(name = "full_name", nullable = false)
     private String fullName;
 
+    @Pattern(
+        regexp = "^[a-zA-Z0-9_.]+$",
+        message = "Username can only contain letters, numbers, underscore (_) and dot (.). No spaces or other special characters allowed."
+    )
     @Column(name = "user_name", nullable = false, unique = true)
     private String userName;
 

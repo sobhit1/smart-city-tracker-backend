@@ -33,6 +33,8 @@ public class IssueService {
     private final UserRepository userRepository;
     private final CommentRepository commentRepository;
 
+    private static final int MAX_ATTACHMENTS_PER_ENTITY = 5;
+
     public IssueService(IssueRepository issueRepository, CloudinaryService cloudinaryService,
             AttachmentRepository attachmentRepository, CategoryRepository categoryRepository,
             StatusRepository statusRepository, PriorityRepository priorityRepository,
@@ -58,6 +60,11 @@ public class IssueService {
     public IssueDetailsDTO createIssue(CreateIssueRequest request, List<MultipartFile> files) {
         if (files == null || files.isEmpty()) {
             throw new BadRequestException("Cannot create an issue without at least one attachment.");
+        }
+
+        if (files.size() > MAX_ATTACHMENTS_PER_ENTITY) {
+            throw new BadRequestException("Maximum " + MAX_ATTACHMENTS_PER_ENTITY
+                    + " attachments are allowed per issue. You provided " + files.size() + " files.");
         }
 
         User reporter = SecurityUtils.getCurrentUser();
@@ -249,6 +256,17 @@ public class IssueService {
 
         if (!isAdmin && !isStaffAndAssignee && !isReporter) {
             throw new UnauthorizedException("You do not have permission to add attachments to this issue.");
+        }
+
+        int currentAttachmentCount = issue.getAttachments().size();
+        int newFilesCount = files.size();
+        int totalAfterUpload = currentAttachmentCount + newFilesCount;
+
+        if (totalAfterUpload > MAX_ATTACHMENTS_PER_ENTITY) {
+            throw new BadRequestException(
+                    "Cannot add " + newFilesCount + " files. Issue already has " + currentAttachmentCount +
+                            " attachments. Maximum " + MAX_ATTACHMENTS_PER_ENTITY
+                            + " attachments are allowed per issue.");
         }
 
         List<Attachment> newAttachments = new ArrayList<>();

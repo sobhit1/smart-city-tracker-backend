@@ -21,6 +21,8 @@ public class CommentService {
     private final CloudinaryService cloudinaryService;
     private final AttachmentRepository attachmentRepository;
 
+    private static final int MAX_ATTACHMENTS_PER_ENTITY = 5;
+
     public CommentService(CommentRepository commentRepository,
                           IssueRepository issueRepository,
                           CloudinaryService cloudinaryService,
@@ -59,6 +61,10 @@ public class CommentService {
         }
 
         if (files != null && !files.isEmpty()) {
+            if (files.size() > MAX_ATTACHMENTS_PER_ENTITY) {
+                throw new BadRequestException("Maximum " + MAX_ATTACHMENTS_PER_ENTITY + " attachments are allowed per comment. You provided " + files.size() + " files.");
+            }
+
             for (MultipartFile file : files) {
                 try {
                     Map<String, String> uploadResult = cloudinaryService.uploadFile(file);
@@ -192,6 +198,7 @@ public class CommentService {
     /**
      * Adds one or more attachments to an existing comment.
      * Only the comment author can add attachments.
+     * Validates that the total number of attachments does not exceed the maximum limit.
      *
      * @param issueId   The ID of the parent issue (for validation).
      * @param commentId The ID of the comment to add attachments to.
@@ -213,6 +220,17 @@ public class CommentService {
 
         if (!isAuthor) {
             throw new UnauthorizedException("You do not have permission to add attachments to this comment.");
+        }
+
+        int currentAttachmentCount = comment.getAttachments().size();
+        int newFilesCount = files.size();
+        int totalAfterUpload = currentAttachmentCount + newFilesCount;
+
+        if (totalAfterUpload > MAX_ATTACHMENTS_PER_ENTITY) {
+            throw new BadRequestException(
+                "Cannot add " + newFilesCount + " files. Comment already has " + currentAttachmentCount + 
+                " attachments. Maximum " + MAX_ATTACHMENTS_PER_ENTITY + " attachments are allowed per comment."
+            );
         }
 
         List<Attachment> newAttachments = new ArrayList<>();
