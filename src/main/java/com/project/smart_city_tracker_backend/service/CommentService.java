@@ -117,9 +117,9 @@ public class CommentService {
     }
 
     /**
-     * Deletes an existing comment.
-     * The comment author can delete their own comment.
-     * Admins can delete any comment.
+     * Deletes an existing comment and all its attachments from Cloudinary and the database.
+     * This method handles nested comments (replies) and their attachments recursively.
+     * The comment author can delete their own comment. Admins can delete any comment.
      *
      * @param issueId   The ID of the parent issue.
      * @param commentId The ID of the comment to delete.
@@ -146,7 +146,47 @@ public class CommentService {
             throw new UnauthorizedException("You are not authorized to delete this comment.");
         }
 
+        deleteCommentAndNestedAttachments(comment);
+    }
+
+    /**
+     * Recursively deletes a comment and all its nested comments (replies) along with their attachments.
+     * This ensures that when a parent comment is deleted, all child comments and their attachments are also deleted.
+     *
+     * @param comment The comment to delete along with its nested structure.
+     */
+    private void deleteCommentAndNestedAttachments(Comment comment) {
+        if (comment.getReplies() != null && !comment.getReplies().isEmpty()) {
+            Set<Comment> repliesCopy = new HashSet<>(comment.getReplies());
+            for (Comment reply : repliesCopy) {
+                deleteCommentAndNestedAttachments(reply);
+            }
+        }
+
+        deleteCommentAttachmentsFromCloudinary(comment);
+
         commentRepository.delete(comment);
+    }
+
+    /**
+     * Deletes all attachments associated with a comment from both Cloudinary and the database.
+     * This method handles the actual file deletion from Cloudinary storage.
+     *
+     * @param comment The comment whose attachments need to be deleted.
+     */
+    private void deleteCommentAttachmentsFromCloudinary(Comment comment) {
+        Set<Attachment> attachments = comment.getAttachments();
+        if (attachments != null && !attachments.isEmpty()) {
+            for (Attachment attachment : attachments) {
+                try {
+                    cloudinaryService.deleteFile(attachment.getPublicId());
+                } catch (IOException e) {
+                    System.err.println("Failed to delete file from Cloudinary for publicId: " + 
+                            attachment.getPublicId() + ". Error: " + e.getMessage());
+                }
+            }
+            attachments.clear();
+        }
     }
 
     /**

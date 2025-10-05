@@ -1,10 +1,7 @@
 package com.project.smart_city_tracker_backend.dto;
 
 import com.project.smart_city_tracker_backend.model.Issue;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 import java.time.Instant;
 
@@ -18,6 +15,7 @@ public class IssueSummaryDTO {
     private String title;
     private String category;
     private String status;
+    private String priority;
     private Instant reportedAt;
     private UserSummaryDTO reporter;
     private UserSummaryDTO assignee;
@@ -41,6 +39,13 @@ public class IssueSummaryDTO {
         }
         if (issue.getStatus() != null) {
             this.status = issue.getStatus().getName();
+        } else {
+            this.status = "OPEN";
+        }
+        if (issue.getPriority() != null) {
+            this.priority = issue.getPriority().getName();
+        } else {
+            this.priority = "Medium";
         }
         if (issue.getReporter() != null) {
             this.reporter = new UserSummaryDTO(issue.getReporter().getId(), issue.getReporter().getFullName());

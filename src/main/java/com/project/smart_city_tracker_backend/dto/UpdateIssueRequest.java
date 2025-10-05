@@ -28,4 +28,8 @@ public class UpdateIssueRequest {
     private Instant startDate;
 
     private Instant dueDate;
+
+    private Double latitude;
+    
+    private Double longitude;
 }

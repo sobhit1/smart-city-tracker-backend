@@ -31,11 +31,12 @@ public class IssueService {
     private final StatusRepository statusRepository;
     private final PriorityRepository priorityRepository;
     private final UserRepository userRepository;
+    private final CommentRepository commentRepository;
 
     public IssueService(IssueRepository issueRepository, CloudinaryService cloudinaryService,
-                        AttachmentRepository attachmentRepository, CategoryRepository categoryRepository,
-                        StatusRepository statusRepository, PriorityRepository priorityRepository,
-                        UserRepository userRepository) {
+            AttachmentRepository attachmentRepository, CategoryRepository categoryRepository,
+            StatusRepository statusRepository, PriorityRepository priorityRepository,
+            UserRepository userRepository, CommentRepository commentRepository) {
         this.issueRepository = issueRepository;
         this.cloudinaryService = cloudinaryService;
         this.attachmentRepository = attachmentRepository;
@@ -43,6 +44,7 @@ public class IssueService {
         this.statusRepository = statusRepository;
         this.priorityRepository = priorityRepository;
         this.userRepository = userRepository;
+        this.commentRepository = commentRepository;
     }
 
     /**
@@ -96,7 +98,7 @@ public class IssueService {
         }
 
         Issue savedIssue = issueRepository.save(issue);
-        
+
         return new IssueDetailsDTO(savedIssue);
     }
 
@@ -116,8 +118,9 @@ public class IssueService {
         if ("me".equalsIgnoreCase(assignedTo)) {
             User currentUser = SecurityUtils.getCurrentUser();
             boolean isStaffOrAdmin = currentUser.getAuthorities().stream()
-                    .anyMatch(auth -> auth.getAuthority().equals("ROLE_STAFF") || auth.getAuthority().equals("ROLE_ADMIN"));
-            
+                    .anyMatch(auth -> auth.getAuthority().equals("ROLE_STAFF")
+                            || auth.getAuthority().equals("ROLE_ADMIN"));
+
             if (!isStaffOrAdmin) {
                 throw new UnauthorizedException("You do not have permission to use the 'assignedTo' filter.");
             }
@@ -164,7 +167,7 @@ public class IssueService {
             for (FilterParser.FilterCriteria criteria : criteriaList) {
                 String field = criteria.getField();
                 String value = criteria.getValue();
-                
+
                 if (field.equalsIgnoreCase("priority")) {
                     Join<Object, Object> join = root.join(field);
                     predicates.add(criteriaBuilder.equal(join.get("name"), value));
@@ -189,17 +192,15 @@ public class IssueService {
                              predicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get(field)), "%" + value.toLowerCase()));
                             break;
                         case "isempty":
-                             predicates.add(criteriaBuilder.or(
-                                 criteriaBuilder.isNull(root.get(field)),
-                                 criteriaBuilder.equal(root.get(field), "")
-                             ));
-                             break;
+                            predicates.add(criteriaBuilder.or(
+                                    criteriaBuilder.isNull(root.get(field)),
+                                    criteriaBuilder.equal(root.get(field), "")));
+                            break;
                         case "isnotempty":
-                             predicates.add(criteriaBuilder.and(
-                                 criteriaBuilder.isNotNull(root.get(field)),
-                                 criteriaBuilder.notEqual(root.get(field), "")
-                             ));
-                             break;
+                            predicates.add(criteriaBuilder.and(
+                                    criteriaBuilder.isNotNull(root.get(field)),
+                                    criteriaBuilder.notEqual(root.get(field), "")));
+                            break;
                         default:
                             throw new BadRequestException("Unsupported filter operator: " + criteria.getOperator());
                     }
@@ -215,13 +216,13 @@ public class IssueService {
      */
     private Pageable remapSortProperty(Pageable pageable, String fromProperty, String toProperty) {
         List<Sort.Order> correctedOrders = pageable.getSort().stream()
-            .map(order -> {
-                if (order.getProperty().equalsIgnoreCase(fromProperty)) {
-                    return new Sort.Order(order.getDirection(), toProperty);
-                }
-                return order;
-            })
-            .collect(Collectors.toList());
+                .map(order -> {
+                    if (order.getProperty().equalsIgnoreCase(fromProperty)) {
+                        return new Sort.Order(order.getDirection(), toProperty);
+                    }
+                    return order;
+                })
+                .collect(Collectors.toList());
         Sort correctedSort = Sort.by(correctedOrders);
         return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), correctedSort);
     }
@@ -239,14 +240,17 @@ public class IssueService {
         Issue issue = issueRepository.findById(issueId)
                 .orElseThrow(() -> new ResourceNotFoundException("Issue", "id", issueId));
 
-        boolean isAdmin = currentUser.getAuthorities().stream().anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN"));
-        boolean isStaffAndAssignee = currentUser.getAuthorities().stream().anyMatch(auth -> auth.getAuthority().equals("ROLE_STAFF")) && issue.getAssignee() != null && Objects.equals(issue.getAssignee().getId(), currentUser.getId());
+        boolean isAdmin = currentUser.getAuthorities().stream()
+                .anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN"));
+        boolean isStaffAndAssignee = currentUser.getAuthorities().stream()
+                .anyMatch(auth -> auth.getAuthority().equals("ROLE_STAFF")) && issue.getAssignee() != null
+                && Objects.equals(issue.getAssignee().getId(), currentUser.getId());
         boolean isReporter = Objects.equals(issue.getReporter().getId(), currentUser.getId());
 
         if (!isAdmin && !isStaffAndAssignee && !isReporter) {
             throw new UnauthorizedException("You do not have permission to add attachments to this issue.");
         }
-        
+
         List<Attachment> newAttachments = new ArrayList<>();
         for (MultipartFile file : files) {
             try {
@@ -269,6 +273,8 @@ public class IssueService {
 
     /**
      * Deletes an attachment from an issue or a comment.
+     * This method handles deletion from both Cloudinary and the database with
+     * proper error handling.
      *
      * @param issueId      The ID of the parent issue (for verification).
      * @param attachmentId The ID of the attachment to delete.
@@ -276,7 +282,7 @@ public class IssueService {
     @Transactional
     public void deleteAttachment(Long issueId, Long attachmentId) {
         User currentUser = SecurityUtils.getCurrentUser();
-        
+
         Attachment attachment = attachmentRepository.findById(attachmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Attachment", "id", attachmentId));
 
@@ -290,12 +296,12 @@ public class IssueService {
             }
 
             boolean isReporter = Objects.equals(attachment.getIssue().getReporter().getId(), currentUser.getId());
-            
+
             boolean isStaffAndAssignee = currentUser.getAuthorities().stream()
-                .anyMatch(auth -> auth.getAuthority().equals("ROLE_STAFF"))
-                && attachment.getIssue().getAssignee() != null
-                && Objects.equals(attachment.getIssue().getAssignee().getId(), currentUser.getId());
-            
+                    .anyMatch(auth -> auth.getAuthority().equals("ROLE_STAFF"))
+                    && attachment.getIssue().getAssignee() != null
+                    && Objects.equals(attachment.getIssue().getAssignee().getId(), currentUser.getId());
+
             if (isAdmin || isReporter || isStaffAndAssignee) {
                 isAuthorized = true;
             }
@@ -306,7 +312,7 @@ public class IssueService {
             }
 
             boolean isCommentAuthor = Objects.equals(attachment.getComment().getAuthor().getId(), currentUser.getId());
-            
+
             if (isAdmin || isCommentAuthor) {
                 isAuthorized = true;
             }
@@ -321,7 +327,7 @@ public class IssueService {
         try {
             cloudinaryService.deleteFile(attachment.getPublicId());
         } catch (IOException e) {
-            System.err.println("Failed to delete file from Cloudinary, but proceeding with DB deletion: " + e.getMessage());
+            System.err.println("Failed to delete file from Cloudinary for publicId: " + attachment.getPublicId() + ". Error: " + e.getMessage());
         }
 
         attachmentRepository.delete(attachment);
@@ -355,8 +361,11 @@ public class IssueService {
         Issue issue = issueRepository.findById(issueId)
                 .orElseThrow(() -> new ResourceNotFoundException("Issue", "id", issueId));
 
-        boolean isAdmin = currentUser.getAuthorities().stream().anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN"));
-        boolean isStaffAndAssignee = currentUser.getAuthorities().stream().anyMatch(auth -> auth.getAuthority().equals("ROLE_STAFF")) && issue.getAssignee() != null && Objects.equals(issue.getAssignee().getId(), currentUser.getId());
+        boolean isAdmin = currentUser.getAuthorities().stream()
+                .anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN"));
+        boolean isStaffAndAssignee = currentUser.getAuthorities().stream()
+                .anyMatch(auth -> auth.getAuthority().equals("ROLE_STAFF")) && issue.getAssignee() != null
+                && Objects.equals(issue.getAssignee().getId(), currentUser.getId());
         boolean isReporter = Objects.equals(issue.getReporter().getId(), currentUser.getId());
 
         if (!isAdmin && !isStaffAndAssignee && !isReporter) {
@@ -393,16 +402,22 @@ public class IssueService {
                 issue.setAssignee(assignee);
             }
         }
-
         if (request.getStartDate() != null) {
             issue.setStartDate(request.getStartDate());
         }
         if (request.getDueDate() != null) {
-            Instant effectiveStartDate = (request.getStartDate() != null) ? request.getStartDate() : issue.getStartDate();
+            Instant effectiveStartDate = (request.getStartDate() != null) ? request.getStartDate()
+                    : issue.getStartDate();
             if (effectiveStartDate != null && request.getDueDate().isBefore(effectiveStartDate)) {
                 throw new BadRequestException("Due date cannot be before the start date.");
             }
             issue.setDueDate(request.getDueDate());
+        }
+        if (request.getLatitude() != null) {
+            issue.setLatitude(request.getLatitude());
+        }
+        if (request.getLongitude() != null) {
+            issue.setLongitude(request.getLongitude());
         }
 
         Issue updatedIssue = issueRepository.save(issue);
@@ -411,7 +426,9 @@ public class IssueService {
     }
 
     /**
-     * Deletes an entire issue along with its attachments from the database.
+     * Deletes an entire issue along with all its attachments and comments from both Cloudinary and the database.
+     * This method handles the complete cleanup of all related entities including
+     * nested comments and their attachments.
      *
      * @param issueId The ID of the issue to delete.
      */
@@ -429,14 +446,88 @@ public class IssueService {
             throw new UnauthorizedException("You do not have permission to delete this issue.");
         }
 
-        for (Attachment attachment : issue.getAttachments()) {
-            try {
-                cloudinaryService.deleteFile(attachment.getPublicId());
-            } catch (IOException e) {
-                System.err.println("Failed to delete file from Cloudinary with public_id: " + attachment.getPublicId() + ". Error: " + e.getMessage());
+        deleteIssueAttachmentsFromCloudinary(issue);
+
+        deleteAllCommentsWithAttachments(issue);
+
+        issueRepository.delete(issue);
+    }
+
+    /**
+     * Deletes all attachments associated with an issue from Cloudinary storage.
+     * This method ensures that all files are properly removed from Cloudinary.
+     *
+     * @param issue The issue whose attachments need to be deleted.
+     */
+    private void deleteIssueAttachmentsFromCloudinary(Issue issue) {
+        Set<Attachment> issueAttachments = issue.getAttachments();
+        if (issueAttachments != null && !issueAttachments.isEmpty()) {
+            for (Attachment attachment : issueAttachments) {
+                try {
+                    cloudinaryService.deleteFile(attachment.getPublicId());
+                } catch (IOException e) {
+                    System.err.println("Failed to delete issue attachment from Cloudinary with public_id: " +
+                            attachment.getPublicId() + ". Error: " + e.getMessage());
+                }
+            }
+        }
+    }
+
+    /**
+     * Deletes all comments associated with an issue, including nested comments and their attachments.
+     * This method handles the complete comment tree deletion with proper Cloudinary cleanup.
+     *
+     * @param issue The issue whose comments need to be deleted.
+     */
+    private void deleteAllCommentsWithAttachments(Issue issue) {
+        Set<Comment> comments = issue.getComments();
+        if (comments != null && !comments.isEmpty()) {
+            List<Comment> topLevelComments = comments.stream()
+                    .filter(comment -> comment.getParent() == null)
+                    .collect(Collectors.toList());
+
+            for (Comment comment : topLevelComments) {
+                deleteCommentAndNestedAttachments(comment);
+            }
+        }
+    }
+
+    /**
+     * Recursively deletes a comment and all its nested comments (replies) along with their attachments.
+     * This method ensures that the entire comment tree is properly cleaned up from both database and Cloudinary.
+     *
+     * @param comment The comment to delete along with its nested structure.
+     */
+    private void deleteCommentAndNestedAttachments(Comment comment) {
+        if (comment.getReplies() != null && !comment.getReplies().isEmpty()) {
+            Set<Comment> repliesCopy = new HashSet<>(comment.getReplies());
+            for (Comment reply : repliesCopy) {
+                deleteCommentAndNestedAttachments(reply);
             }
         }
 
-        issueRepository.delete(issue);
+        deleteCommentAttachmentsFromCloudinary(comment);
+
+        commentRepository.delete(comment);
+    }
+
+    /**
+     * Deletes all attachments associated with a comment from Cloudinary storage.
+     * This method handles the actual file deletion from Cloudinary.
+     *
+     * @param comment The comment whose attachments need to be deleted.
+     */
+    private void deleteCommentAttachmentsFromCloudinary(Comment comment) {
+        Set<Attachment> attachments = comment.getAttachments();
+        if (attachments != null && !attachments.isEmpty()) {
+            for (Attachment attachment : attachments) {
+                try {
+                    cloudinaryService.deleteFile(attachment.getPublicId());
+                } catch (IOException e) {
+                    System.err.println("Failed to delete comment attachment from Cloudinary for publicId: " +
+                            attachment.getPublicId() + ". Error: " + e.getMessage());
+                }
+            }
+        }
     }
 }
