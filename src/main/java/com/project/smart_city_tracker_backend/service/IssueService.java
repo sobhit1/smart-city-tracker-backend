@@ -147,9 +147,7 @@ public class IssueService {
             List<Predicate> predicates = new ArrayList<>();
 
             if (StringUtils.hasText(search)) {
-                Predicate titlePredicate = criteriaBuilder.like(criteriaBuilder.lower(root.get("title")), "%" + search.toLowerCase() + "%");
-                Predicate descriptionPredicate = criteriaBuilder.like(criteriaBuilder.lower(root.get("description")), "%" + search.toLowerCase() + "%");
-                predicates.add(criteriaBuilder.or(titlePredicate, descriptionPredicate));
+                predicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("title")), "%" + search.toLowerCase() + "%"));
             }
 
             if (StringUtils.hasText(category) && !category.equalsIgnoreCase("All")) {
@@ -196,7 +194,7 @@ public class IssueService {
                             predicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get(field)), value.toLowerCase() + "%"));
                             break;
                         case "endswith":
-                             predicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get(field)), "%" + value.toLowerCase()));
+                            predicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get(field)), "%" + value.toLowerCase()));
                             break;
                         case "isempty":
                             predicates.add(criteriaBuilder.or(
