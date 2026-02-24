@@ -59,7 +59,8 @@ public class SecurityConfig {
                         .authenticationEntryPoint(unauthorizedHandler))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/api/auth/**", "/v3/api-docs/**", "/swagger-ui/**", "/h2-console/**",
+                        .requestMatchers("/api/auth/**", "/api/test/**", "/v3/api-docs/**", "/swagger-ui/**",
+                                "/h2-console/**",
                                 "/actuator/**")
                         .permitAll()
                         .anyRequest().authenticated())
